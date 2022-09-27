@@ -3,6 +3,10 @@ package com.example.barcodescanner
 import android.Manifest
 import android.content.ContentValues
 import android.content.pm.PackageManager
+import android.graphics.ImageFormat
+import android.graphics.Rect
+import android.graphics.YuvImage
+import android.media.Image
 import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
@@ -17,6 +21,9 @@ import androidx.camera.video.VideoCapture
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.barcodescanner.databinding.ActivityMainBinding
+import com.google.zxing.*
+import com.google.zxing.common.HybridBinarizer
+import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.text.SimpleDateFormat
 import java.util.*
@@ -115,7 +122,7 @@ class MainActivity : AppCompatActivity() {
             val imageAnalizer = ImageAnalysis.Builder()
                 .build()
                 .also {
-                    it.setAnalyzer(cameraExecutor, LuminosityAnalyser { luma ->
+                    it.setAnalyzer(cameraExecutor, BarcodeAnalizer { luma ->
                         Log.d(TAG, "Average luminosity: $luma")
                     })
                 }
@@ -214,11 +221,41 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private class BarcodeAnalizer(): ImageAnalysis.Analyzer {
+    private class BarcodeAnalizer(private val listener: (luma: String) -> Unit): ImageAnalysis.Analyzer {
         override fun analyze(image: ImageProxy) {
+
+            val imageByteArray = image.image?.toByteArray()
+
+            val luminanceSource = PlanarYUVLuminanceSource(
+                imageByteArray, image.width, image.height,
+                0, 0, 640, 480, false
+            )
+
+            val hybridBinarizer = HybridBinarizer(luminanceSource)
+
+            val binaryBitmap = BinaryBitmap(hybridBinarizer)
+
+            val multiFormatReader = MultiFormatReader()
+
+            val hints = mapOf<DecodeHintType,List<BarcodeFormat>>(
+                DecodeHintType.POSSIBLE_FORMATS to listOf<BarcodeFormat>(BarcodeFormat.EAN_13)
+            )
+
+            multiFormatReader.setHints(hints)
+
+            try {
+                val result = multiFormatReader.decode(binaryBitmap)
+                listener(result.text)
+            } catch (exc: NotFoundException) {
+
+            }
+
+            image.close()
 
         }
     }
+
+
 
     companion object {
         private const val TAG = "BarcodeScanner"
@@ -234,4 +271,21 @@ class MainActivity : AppCompatActivity() {
         }.toTypedArray()
     }
 
+}
+
+fun Image.toByteArray(): ByteArray {
+    val yBuffer = planes[0].buffer // Y
+    val vuBuffer = planes[2].buffer // VU
+
+    val ySize = yBuffer.remaining()
+    val vuSize = vuBuffer.remaining()
+
+    val nv21 = ByteArray(ySize + vuSize)
+
+    yBuffer.get(nv21, 0, ySize)
+    vuBuffer.get(nv21, ySize, vuSize)
+
+    val yuvImage = YuvImage(nv21, ImageFormat.NV21, width, height, null)
+
+    return yuvImage.yuvData
 }
