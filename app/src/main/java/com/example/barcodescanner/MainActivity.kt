@@ -11,13 +11,9 @@ import android.util.Log
 import android.widget.Toast
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.video.Recorder
-import androidx.camera.video.Recording
-import androidx.camera.video.VideoCapture
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.barcodescanner.databinding.ActivityMainBinding
-import java.nio.ByteBuffer
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.ExecutorService
@@ -28,9 +24,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var viewBinding: ActivityMainBinding
 
     private var imageCapture: ImageCapture? = null
-
-    private var videoCapture: VideoCapture<Recorder>? = null
-    private var recording: Recording? = null
 
     private lateinit var cameraExecutor: ExecutorService
 
@@ -115,8 +108,8 @@ class MainActivity : AppCompatActivity() {
             val imageAnalizer = ImageAnalysis.Builder()
                 .build()
                 .also {
-                    it.setAnalyzer(cameraExecutor, LuminosityAnalyser { luma ->
-                        Log.d(TAG, "Average luminosity: $luma")
+                    it.setAnalyzer(cameraExecutor, BarcodeAnalizer { result ->
+                        Log.d(TAG, "Barcode data: ${result.text}")
                     })
                 }
 
@@ -159,64 +152,6 @@ class MainActivity : AppCompatActivity() {
                     Toast.LENGTH_SHORT).show()
                 finish()
             }
-        }
-    }
-
-    fun readBarcode(){
-//        val image = object {}.javaClass.getResourceAsStream("1.png")
-//        val bufferedImage = ImageIO.read(image)
-//
-//        val pixels = IntArray(bufferedImage.width * bufferedImage.height)
-//
-//        var index = 0
-//        for (y in 0 until bufferedImage.height)
-//            for (x in 0 until  bufferedImage.width) {
-//                pixels[index] = bufferedImage.getRGB(x, y);
-//                index++
-//            }
-//
-//        val luminanceSource = RGBLuminanceSource(bufferedImage.width, bufferedImage.height, pixels)
-//
-//        val hybridBinarizer = HybridBinarizer(luminanceSource)
-//
-//        val binaryBitmap = BinaryBitmap(hybridBinarizer)
-//
-//        val multiFormatReader = MultiFormatReader()
-//
-//        val hints = mapOf<DecodeHintType,List<BarcodeFormat>>(
-//            DecodeHintType.POSSIBLE_FORMATS to listOf<BarcodeFormat>(BarcodeFormat.EAN_13)
-//        )
-//
-//        multiFormatReader.setHints(hints)
-//
-//        val result = multiFormatReader.decode(binaryBitmap)
-//
-//        println(result.text)
-    }
-
-    private class LuminosityAnalyser(private val listener: (luma: Double) -> Unit): ImageAnalysis.Analyzer{
-
-        private fun ByteBuffer.toByteArray(): ByteArray {
-            rewind()
-            val data = ByteArray(remaining())
-            get(data)
-            return data
-        }
-
-        override fun analyze(image: ImageProxy) {
-            val buffer = image.planes[0].buffer
-            val data = buffer.toByteArray()
-            val pixels = data.map { it.toInt() and 0xFF }
-            val luma = pixels.average()
-            listener(luma)
-
-            image.close()
-        }
-    }
-
-    private class BarcodeAnalizer(): ImageAnalysis.Analyzer {
-        override fun analyze(image: ImageProxy) {
-
         }
     }
 

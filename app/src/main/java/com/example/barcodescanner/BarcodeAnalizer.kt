@@ -1,0 +1,65 @@
+package com.example.barcodescanner
+
+import android.graphics.ImageFormat.*
+import android.util.Log
+import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageProxy
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.BinaryBitmap
+import com.google.zxing.DecodeHintType
+import com.google.zxing.MultiFormatReader
+import com.google.zxing.NotFoundException
+import com.google.zxing.PlanarYUVLuminanceSource
+import com.google.zxing.common.HybridBinarizer
+import com.google.zxing.Result as ZxingResult
+import java.nio.ByteBuffer
+
+class BarcodeAnalizer(
+        private val onBarcodeDetected: (result: ZxingResult) -> Unit
+): ImageAnalysis.Analyzer {
+
+    private val yuvFormats = mutableListOf(YUV_420_888, YUV_422_888, YUV_444_888)
+
+    private val reader = MultiFormatReader().apply {
+        val map = mapOf(
+            DecodeHintType.POSSIBLE_FORMATS to arrayListOf(BarcodeFormat.EAN_13)
+        )
+        setHints(map)
+    }
+
+    override fun analyze(image: ImageProxy) {
+        if (image.format !in yuvFormats){
+            Log.e("BarcodeScanner", "Expected YUV, now = ${image.format}")
+            return
+        }
+
+        val data = image.planes[0].buffer.toByteArray()
+
+        val source = PlanarYUVLuminanceSource(
+            data,
+            image.width,
+            image.height,
+            0,
+            0,
+            image.width,
+            image.height,
+            false
+        )
+
+        val binaryBitmap = BinaryBitmap(HybridBinarizer(source))
+        try {
+            val result = reader.decode(binaryBitmap)
+            onBarcodeDetected(result)
+        } catch (e: NotFoundException) {
+            e.printStackTrace()
+        }
+        image.close()
+    }
+}
+
+private fun ByteBuffer.toByteArray(): ByteArray {
+    rewind()
+    val data = ByteArray(remaining())
+    get(data)
+    return data
+}
