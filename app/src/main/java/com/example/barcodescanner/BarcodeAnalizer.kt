@@ -35,6 +35,10 @@ class BarcodeAnalizer(
 
         val data = image.planes[0].buffer.toByteArray()
 
+//        val rotatedImage = RotatedImage(data, image.width, image.height)
+//
+//        rotateImageArray(rotatedImage, rotationDegrees)
+
         val source = PlanarYUVLuminanceSource(
             data,
             image.width,
@@ -55,6 +59,36 @@ class BarcodeAnalizer(
         }
         image.close()
     }
+
+    private fun rotateImageArray(imageToRotate: RotatedImage, rotationDegrees: Int) {
+        if (rotationDegrees == 0) return // no rotation
+        if (rotationDegrees % 90 != 0) return // only 90 degree times rotations
+
+        val width = imageToRotate.width
+        val height = imageToRotate.height
+
+        val rotatedData = ByteArray(imageToRotate.byteArray.size)
+        for (y in 0 until height) { // we scan the array by rows
+            for (x in 0 until width) {
+                when (rotationDegrees) {
+                    90 -> rotatedData[x * height + height - y - 1] =
+                        imageToRotate.byteArray[x + y * width] // Fill from top-right toward left (CW)
+                    180 -> rotatedData[width * (height - y - 1) + width - x - 1] =
+                        imageToRotate.byteArray[x + y * width] // Fill from bottom-right toward up (CW)
+                    270 -> rotatedData[y + x * height] =
+                        imageToRotate.byteArray[y * width + width - x - 1] // The opposite (CCW) of 90 degrees
+                }
+            }
+        }
+
+        imageToRotate.byteArray = rotatedData
+
+        if (rotationDegrees != 180) {
+            imageToRotate.height = width
+            imageToRotate.width = height
+        }
+    }
+
 }
 
 private fun ByteBuffer.toByteArray(): ByteArray {
@@ -63,3 +97,5 @@ private fun ByteBuffer.toByteArray(): ByteArray {
     get(data)
     return data
 }
+
+private data class RotatedImage(var byteArray: ByteArray, var width: Int, var height: Int)
